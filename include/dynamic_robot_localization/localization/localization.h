@@ -166,6 +166,7 @@ class Localization : public ConfigurableObject {
 			MissingReferencePointCloud,
 			PointCloudAgeHigherThanMaximum,
 			PointCloudDiscarded,
+			ReachedLimitOfNumberOfPointCloudsToProcess,
 			PointCloudFilteringFailed,
 			PointCloudOlderThanLastPointCloudReceived,
 			PointCloudSubscribersDisabled,
@@ -190,6 +191,7 @@ class Localization : public ConfigurableObject {
 				case MissingReferencePointCloud: return "MissingReferencePointCloud";
 				case PointCloudAgeHigherThanMaximum: return "PointCloudAgeHigherThanMaximum";
 				case PointCloudDiscarded: return "PointCloudDiscarded";
+				case ReachedLimitOfNumberOfPointCloudsToProcess: return "ReachedLimitOfNumberOfPointCloudsToProcess";
 				case PointCloudFilteringFailed: return "PointCloudFilteringFailed";
 				case PointCloudOlderThanLastPointCloudReceived: return "PointCloudOlderThanLastPointCloudReceived";
 				case PointCloudSubscribersDisabled: return "PointCloudSubscribersDisabled";
@@ -284,6 +286,7 @@ class Localization : public ConfigurableObject {
 		static void s_setupTransformationAlignerFromParameterServer(TransformationAligner::Ptr& transformation_aligner, const std::string &configuration_namespace,
 																	ros::NodeHandlePtr& node_handle, ros::NodeHandlePtr& private_node_handle);
 
+		bool clearReferencePointCloud();
 		virtual bool loadReferencePointCloud();
 		virtual bool loadReferencePointCloudFromFile(const std::string& reference_pointcloud_filename, const std::string& reference_pointclouds_database_folder_path = std::string(""));
 		virtual void loadReferencePointCloudFromROSPointCloud(const sensor_msgs::PointCloud2ConstPtr& reference_pointcloud_msg);
@@ -404,6 +407,8 @@ class Localization : public ConfigurableObject {
 		std::string getOdomFrameId() { return odom_frame_id_; }
 		std::string getBaseLinkFrameId() { return base_link_frame_id_; }
 		std::string getSensorFrameId() { return sensor_frame_id_; }
+		int getLimitOfPointcloudsToProcess() { return limit_of_pointclouds_to_process_; }
+		size_t getNumberOfProcessedPointclouds() { return number_of_processed_pointclouds_; }
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   </gets>  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   <sets>   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -411,6 +416,7 @@ class Localization : public ConfigurableObject {
 		void setAmbientPointcloudIntegrationFiltersPreprocessedPointcloudSaveFilename(const std::string& filename) { ambient_pointcloud_integration_filters_preprocessed_pointcloud_save_filename_ = filename; }
 		void setFilteredPointcloudSaveFilename(const std::string& filtered_pointcloud_save_filename) { filtered_pointcloud_save_filename_ = filtered_pointcloud_save_filename; }
 		void setFilteredPointcloudSaveFrameId(const std::string& filtered_pointcloud_save_frame_id) { filtered_pointcloud_save_frame_id_ = filtered_pointcloud_save_frame_id; }
+		void setLimitOfPointcloudsToProcess(int limit_of_pointclouds_to_process) { limit_of_pointclouds_to_process_ = limit_of_pointclouds_to_process; }
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   </sets>  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	// ========================================================================   </public-section>  ===========================================================================
 

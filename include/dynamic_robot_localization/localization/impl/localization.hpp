@@ -1172,6 +1172,19 @@ void Localization<PointT>::s_setupTransformationAlignerFromParameterServer(Trans
 
 
 template<typename PointT>
+bool Localization<PointT>::clearReferencePointCloud() {
+	reference_pointcloud_loaded_ = false;
+
+	if (reference_pointcloud_) {
+		reference_pointcloud_->clear();
+		return true;
+	}
+
+	return false;
+}
+
+
+template<typename PointT>
 bool Localization<PointT>::loadReferencePointCloud() {
 	if (reference_pointcloud_required_ && reference_pointcloud_available_ && !reference_pointcloud_filename_.empty()) {
 		if (!loadReferencePointCloudFromFile(reference_pointcloud_filename_, reference_pointclouds_database_folder_path_)) {
@@ -1908,10 +1921,6 @@ bool Localization<PointT>::processAmbientPointCloud(typename pcl::PointCloud<Poi
 				return false;
 		}
 
-		if (limit_of_pointclouds_to_process_ > 0) {
-			++number_of_processed_pointclouds_;
-		}
-
 		ROS_DEBUG_STREAM("Received pointcloud with sequence number " << ambient_pointcloud->header.seq << " in frame " << ambient_pointcloud->header.frame_id << " with " << (ambient_pointcloud->width * ambient_pointcloud->height) << " points and with time stamp " << ambient_cloud_time << " (map_frame_id: " << map_frame_id_ << ")");
 
 		if (checkIfTrackingIsLost()) {
@@ -2181,6 +2190,11 @@ bool Localization<PointT>::processAmbientPointCloud(typename pcl::PointCloud<Poi
 	} catch (std::exception& e) {
 		ROS_ERROR_STREAM("Exception caught in ambient pointcloud callback! Info: [" << e.what() <<"]");
 		sensor_data_processing_status_ = ExceptionRaised;
+	}
+
+	++number_of_processed_pointclouds_;
+	if ((int)number_of_processed_pointclouds_ >= limit_of_pointclouds_to_process_) {
+		stopProcessingSensorData();
 	}
 
 	if (sensor_data_processing_status_ == SuccessfulPreprocessing) {

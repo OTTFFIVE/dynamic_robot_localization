@@ -89,7 +89,7 @@ size_t EuclideanOutlierDetector<PointT>::detectOutliers(typename pcl::search::Kd
 
 			bool point_is_inlier = false;
 			float point_distance_squared = -1.0f;
-			if (number_of_neighbors_found > 0 && number_of_neighbors_found == search_indices.size() && number_of_neighbors_found == search_sqr_distances.size()) {
+			if (number_of_neighbors_found > 0 && (size_t)number_of_neighbors_found == search_indices.size() && (size_t)number_of_neighbors_found == search_sqr_distances.size()) {
 				if (difference_validators_enabled) {
 					bool valid_curvature = true;
 					bool valid_normal = true;
