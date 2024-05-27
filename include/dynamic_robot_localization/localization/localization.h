@@ -602,6 +602,7 @@ class Localization : public ConfigurableObject {
 		std::vector< typename CloudFilter<PointT>::Ptr > ambient_pointcloud_integration_filters_;
 		std::vector< typename CloudFilter<PointT>::Ptr > ambient_pointcloud_integration_filters_map_frame_;
 		std::vector< typename CloudFilter<PointT>::Ptr > ambient_pointcloud_filters_;
+		std::vector< typename CloudFilter<PointT>::Ptr > ambient_pointcloud_filters_for_outlier_detection_;
 		std::vector< typename CloudFilter<PointT>::Ptr > ambient_pointcloud_filters_custom_frame_;
 		std::string ambient_pointcloud_filters_custom_frame_id_;
 		std::vector< typename CloudFilter<PointT>::Ptr > ambient_pointcloud_filters_map_frame_;

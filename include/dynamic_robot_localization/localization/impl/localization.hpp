@@ -564,6 +564,7 @@ void Localization<PointT>::setupCloudFiltersFromParameterServer(const std::strin
 	ambient_pointcloud_feature_registration_filters_.clear();
 	ambient_pointcloud_map_frame_feature_registration_filters_.clear();
 	ambient_pointcloud_filters_.clear();
+	ambient_pointcloud_filters_for_outlier_detection_.clear();
 	ambient_pointcloud_filters_custom_frame_.clear();
 	ambient_pointcloud_filters_map_frame_.clear();
 	ambient_pointcloud_filters_after_normal_estimation_.clear();
@@ -582,6 +583,7 @@ void Localization<PointT>::setupCloudFiltersFromParameterServer(const std::strin
 	setupCloudFiltersFromParameterServer(ambient_pointcloud_feature_registration_filters_, configuration_namespace + "filters/ambient_pointcloud_feature_registration/");
 	setupCloudFiltersFromParameterServer(ambient_pointcloud_map_frame_feature_registration_filters_, configuration_namespace + "filters/ambient_pointcloud_map_frame_feature_registration/");
 	setupCloudFiltersFromParameterServer(ambient_pointcloud_filters_, configuration_namespace + "filters/ambient_pointcloud/");
+	setupCloudFiltersFromParameterServer(ambient_pointcloud_filters_for_outlier_detection_, configuration_namespace + "filters/ambient_pointcloud_for_outlier_detection/");
 	setupCloudFiltersFromParameterServer(ambient_pointcloud_filters_custom_frame_, configuration_namespace + "filters/ambient_pointcloud_custom_frame/");
 	private_node_handle_->param(configuration_namespace + "filters/ambient_pointcloud_custom_frame/custom_frame_id", ambient_pointcloud_filters_custom_frame_id_, std::string(""));
 	setupCloudFiltersFromParameterServer(ambient_pointcloud_filters_map_frame_, configuration_namespace + "filters/ambient_pointcloud_map_frame/");
@@ -2278,7 +2280,8 @@ bool Localization<PointT>::applyNormalEstimator(typename NormalEstimator<PointT>
 		sensor_pose_tf_guess.getOrigin().setZ(0.0);
 	}
 
-	bool status = s_applyNormalEstimator(normal_estimator, curvature_estimator, pointcloud, surface, pointcloud_search_method, sensor_pose_tf_guess, minimum_number_of_points_in_ambient_pointcloud_);
+	typename pcl::PointCloud<PointT>::Ptr empty_surface;
+	bool status = s_applyNormalEstimator(normal_estimator, curvature_estimator, pointcloud, use_filtered_cloud_as_normal_estimation_surface_ambient_ ? empty_surface : surface, pointcloud_search_method, sensor_pose_tf_guess, minimum_number_of_points_in_ambient_pointcloud_);
 
 	localization_times_msg_.surface_normal_estimation_time += performance_timer.getElapsedTimeInMilliSec();
 
@@ -2722,6 +2725,25 @@ bool Localization<PointT>::updateLocalizationWithAmbientPointCloud(typename pcl:
 		}
 	}
 
+	typename pcl::PointCloud<PointT>::Ptr ambient_pointcloud_outlier_detection;
+	if (!ambient_pointcloud_filters_for_outlier_detection_.empty()) {
+		ROS_DEBUG("Using different ambient point cloud for outlier detection");
+		ambient_pointcloud_outlier_detection = typename pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>(*ambient_pointcloud));
+		
+		if (!applyCloudFilters(ambient_pointcloud_filters_for_outlier_detection_, ambient_pointcloud_outlier_detection)) {
+			sensor_data_processing_status_ = PointCloudFilteringFailed;
+			return false;
+		}
+		
+		if (!transformCloudToTFFrame(ambient_pointcloud_outlier_detection, pointcloud_time, map_frame_id_for_transforming_pointclouds_)) {
+			sensor_data_processing_status_ = FailedTFTransform;
+			return false;
+		}
+
+		if (reference_pointcloud_2d_) { resetPointCloudHeight(*ambient_pointcloud_outlier_detection); }
+	}
+
+
 	// ==============================================================  filters integration
 	typename pcl::PointCloud<PointT>::Ptr ambient_pointcloud_integration;
 	if (!ambient_pointcloud_integration_filters_.empty() || !ambient_pointcloud_integration_filters_map_frame_.empty()) {
@@ -3042,14 +3064,27 @@ bool Localization<PointT>::updateLocalizationWithAmbientPointCloud(typename pcl:
 
 	ROS_DEBUG("Finished pose estimation");
 
+	typename pcl::search::KdTree<PointT>::Ptr ambient_integration_search_method(new pcl::search::KdTree<PointT>());
 	if (ambient_pointcloud_integration) {
 		pcl::transformPointCloudWithNormals(*ambient_pointcloud_integration, *ambient_pointcloud_integration, laserscan_to_pointcloud::tf_rosmsg_eigen_conversions::transformTF2ToTransform<double>(pose_corrections_out));
+		ambient_integration_search_method->setInputCloud(ambient_pointcloud_integration);
+	}
+
+	typename pcl::search::KdTree<PointT>::Ptr ambient_outliers_search_method(new pcl::search::KdTree<PointT>());
+	if (ambient_pointcloud_outlier_detection) {
+		pcl::transformPointCloudWithNormals(*ambient_pointcloud_outlier_detection, *ambient_pointcloud_outlier_detection, laserscan_to_pointcloud::tf_rosmsg_eigen_conversions::transformTF2ToTransform<double>(pose_corrections_out));
+		ambient_outliers_search_method->setInputCloud(ambient_pointcloud_outlier_detection);
 	}
 
 	// ==============================================================  outlier detection
 	performance_timer.restart();
-	applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_integration ? ambient_pointcloud_integration : ambient_pointcloud);
-	applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_search_method);
+	if (ambient_pointcloud_outlier_detection) {
+		applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_outlier_detection);
+		applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_outliers_search_method);
+	} else {
+		applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_integration ? ambient_pointcloud_integration : ambient_pointcloud);
+		applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_pointcloud_integration ? ambient_integration_search_method : ambient_search_method);
+	}
 	localization_times_msg_.outlier_detection_time = performance_timer.getElapsedTimeInMilliSec();
 
 
@@ -3103,11 +3138,22 @@ bool Localization<PointT>::updateLocalizationWithAmbientPointCloud(typename pcl:
 
 					if (ambient_pointcloud_integration) {
 						pcl::transformPointCloudWithNormals(*ambient_pointcloud_integration, *ambient_pointcloud_integration, laserscan_to_pointcloud::tf_rosmsg_eigen_conversions::transformTF2ToTransform<double>(pose_corrections_out));
+						ambient_integration_search_method->setInputCloud(ambient_pointcloud_integration);
+					}
+
+					if (ambient_pointcloud_outlier_detection) {
+						pcl::transformPointCloudWithNormals(*ambient_pointcloud_outlier_detection, *ambient_pointcloud_outlier_detection, laserscan_to_pointcloud::tf_rosmsg_eigen_conversions::transformTF2ToTransform<double>(pose_corrections_out));
+						ambient_outliers_search_method->setInputCloud(ambient_pointcloud_outlier_detection);
 					}
 
 					performance_timer.restart();
-					applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_integration ? ambient_pointcloud_integration : ambient_pointcloud);
-					applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_search_method);
+					if (ambient_pointcloud_outlier_detection) {
+						applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_outlier_detection);
+						applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_outliers_search_method);
+					} else {
+						applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_integration ? ambient_pointcloud_integration : ambient_pointcloud);
+						applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_pointcloud_integration ? ambient_integration_search_method : ambient_search_method);
+					}
 					localization_times_msg_.outlier_detection_time += performance_timer.getElapsedTimeInMilliSec();
 
 					performance_timer.restart();
