@@ -1209,6 +1209,17 @@ bool Localization<PointT>::loadReferencePointCloudFromFile(const std::string& re
 
 			last_map_received_time_ = ros::Time::now();
 			if (reference_cloud_normal_estimator_) reference_cloud_normal_estimator_->resetOccupancyGridMsg();
+
+			reference_pointcloud_for_outlier_detection_ = typename pcl::PointCloud<PointT>::Ptr(new pcl::PointCloud<PointT>());
+			if (pointcloud_conversions::fromFile(*reference_pointcloud_for_outlier_detection_, reference_pointcloud_filename + "_outlier_detection", (reference_pointclouds_database_folder_path.empty() ? reference_pointclouds_database_folder_path_ : reference_pointclouds_database_folder_path))) {
+				reference_pointcloud_search_method_for_outlier_detection_ = typename pcl::search::KdTree<PointT>::Ptr(new pcl::search::KdTree<PointT>());
+				reference_pointcloud_search_method_for_outlier_detection_->setInputCloud(reference_pointcloud_for_outlier_detection_);
+				ROS_DEBUG_STREAM("Loaded a different point cloud for outlier detection with " << reference_pointcloud_for_outlier_detection_->size() << " points");
+			} else {
+				reference_pointcloud_for_outlier_detection_ = typename pcl::PointCloud<PointT>::Ptr();
+				reference_pointcloud_search_method_for_outlier_detection_ = typename pcl::search::KdTree<PointT>::Ptr();
+			}
+
 			return updateLocalizationPipelineWithNewReferenceCloud(ros::Time::now());
 		}
 	}
@@ -2559,7 +2570,8 @@ bool Localization<PointT>::s_applyPointCloudOutlierDetectors(typename pcl::Point
 template<typename PointT>
 bool Localization<PointT>::applyAmbientPointCloudOutlierDetectors(typename pcl::PointCloud<PointT>::Ptr& ambient_pointcloud) {
 	ROS_DEBUG("Detecting outliers in ambient pointcloud");
-	return s_applyPointCloudOutlierDetectors(ambient_pointcloud, reference_pointcloud_search_method_,
+	return s_applyPointCloudOutlierDetectors(ambient_pointcloud,
+											 reference_pointcloud_search_method_for_outlier_detection_ ? reference_pointcloud_search_method_for_outlier_detection_ : reference_pointcloud_search_method_,
 											 outlier_detectors_,
 											 detected_outliers_, detected_inliers_,
 											 registered_inliers_, registered_outliers_,
@@ -3080,10 +3092,12 @@ bool Localization<PointT>::updateLocalizationWithAmbientPointCloud(typename pcl:
 	performance_timer.restart();
 	if (ambient_pointcloud_outlier_detection) {
 		applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_outlier_detection);
-		applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_outliers_search_method);
+		applyReferencePointCloudOutlierDetectors(reference_pointcloud_for_outlier_detection_ ? reference_pointcloud_for_outlier_detection_ : reference_pointcloud_,
+												 ambient_outliers_search_method);
 	} else {
 		applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_integration ? ambient_pointcloud_integration : ambient_pointcloud);
-		applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_pointcloud_integration ? ambient_integration_search_method : ambient_search_method);
+		applyReferencePointCloudOutlierDetectors(reference_pointcloud_for_outlier_detection_ ? reference_pointcloud_for_outlier_detection_ : reference_pointcloud_,
+												 ambient_pointcloud_integration ? ambient_integration_search_method : ambient_search_method);
 	}
 	localization_times_msg_.outlier_detection_time = performance_timer.getElapsedTimeInMilliSec();
 
@@ -3149,10 +3163,10 @@ bool Localization<PointT>::updateLocalizationWithAmbientPointCloud(typename pcl:
 					performance_timer.restart();
 					if (ambient_pointcloud_outlier_detection) {
 						applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_outlier_detection);
-						applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_outliers_search_method);
+						applyReferencePointCloudOutlierDetectors(reference_pointcloud_for_outlier_detection_ ? reference_pointcloud_for_outlier_detection_ : reference_pointcloud_, ambient_outliers_search_method);
 					} else {
 						applyAmbientPointCloudOutlierDetectors(ambient_pointcloud_integration ? ambient_pointcloud_integration : ambient_pointcloud);
-						applyReferencePointCloudOutlierDetectors(reference_pointcloud_, ambient_pointcloud_integration ? ambient_integration_search_method : ambient_search_method);
+						applyReferencePointCloudOutlierDetectors(reference_pointcloud_for_outlier_detection_ ? reference_pointcloud_for_outlier_detection_ : reference_pointcloud_, ambient_pointcloud_integration ? ambient_integration_search_method : ambient_search_method);
 					}
 					localization_times_msg_.outlier_detection_time += performance_timer.getElapsedTimeInMilliSec();
 

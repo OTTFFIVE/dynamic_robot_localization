@@ -174,6 +174,7 @@ bool fromFile(PointCloudT& pointcloud, const std::string& filename, const std::s
 	}
 
 	bool load_status = false;
+	ROS_INFO_STREAM("Loading point cloud with extension [" << extension << "] from file path [" << filepath << "]");
 
 	if (extension == "pcd") {
 		if (pcl::io::loadPCDFile(filepath, pointcloud) == 0 && !pointcloud.empty()) {

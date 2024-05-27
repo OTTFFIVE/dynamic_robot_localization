@@ -588,6 +588,7 @@ class Localization : public ConfigurableObject {
 
 		// localization fields
 		typename pcl::PointCloud<PointT>::Ptr reference_pointcloud_;
+		typename pcl::PointCloud<PointT>::Ptr reference_pointcloud_for_outlier_detection_;
 		sensor_msgs::PointCloud2Ptr reference_pointcloud_msg_;
 		typename pcl::PointCloud<PointT>::Ptr reference_pointcloud_keypoints_;
 		sensor_msgs::PointCloud2Ptr reference_pointcloud_keypoints_msg_;
@@ -598,6 +599,7 @@ class Localization : public ConfigurableObject {
 		size_t last_number_points_inserted_in_circular_buffer_;
 		std::set<std::string> msg_frame_ids_with_data_in_circular_buffer_;
 		typename pcl::search::KdTree<PointT>::Ptr reference_pointcloud_search_method_;
+		typename pcl::search::KdTree<PointT>::Ptr reference_pointcloud_search_method_for_outlier_detection_;
 		std::vector< typename CloudFilter<PointT>::Ptr > reference_cloud_filters_;
 		std::vector< typename CloudFilter<PointT>::Ptr > ambient_pointcloud_integration_filters_;
 		std::vector< typename CloudFilter<PointT>::Ptr > ambient_pointcloud_integration_filters_map_frame_;
