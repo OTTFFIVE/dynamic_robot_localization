@@ -1045,6 +1045,7 @@ void Localization<PointT>::setupOutlierDetectorsFromParameterServer(const std::s
 	setupOutlierDetectorsFromParameterServer(outlier_detectors_, configuration_namespace + "outlier_detectors/", "aligned_");
 	private_node_handle_->param(configuration_namespace + "outlier_detectors/aligned_pointcloud_global_outliers_publish_topic", aligned_pointcloud_global_outliers_publish_topic_, std::string(""));
 	private_node_handle_->param(configuration_namespace + "outlier_detectors/aligned_pointcloud_global_inliers_publish_topic", aligned_pointcloud_global_inliers_publish_topic_, std::string(""));
+	private_node_handle_->param(configuration_namespace + "outlier_detectors/aligned_pointcloud_global_inliers_and_outliers_publish_topic", aligned_pointcloud_global_inliers_and_outliers_publish_topic_, std::string(""));
 }
 
 
@@ -1053,6 +1054,7 @@ void Localization<PointT>::setupOutlierDetectorsReferencePointCloudFromParameter
 	setupOutlierDetectorsFromParameterServer(outlier_detectors_reference_pointcloud_, configuration_namespace + "outlier_detectors_reference_pointcloud/", "reference_");
 	private_node_handle_->param(configuration_namespace + "outlier_detectors_reference_pointcloud/reference_pointcloud_global_outliers_publish_topic", reference_pointcloud_global_outliers_publish_topic_, std::string(""));
 	private_node_handle_->param(configuration_namespace + "outlier_detectors_reference_pointcloud/reference_pointcloud_global_inliers_publish_topic", reference_pointcloud_global_inliers_publish_topic_, std::string(""));
+	private_node_handle_->param(configuration_namespace + "outlier_detectors_reference_pointcloud/reference_pointcloud_global_inliers_and_outliers_publish_topic", reference_pointcloud_global_inliers_and_outliers_publish_topic_, std::string(""));
 }
 
 
@@ -1539,6 +1541,11 @@ void Localization<PointT>::startPublishers() {
 	else
 		aligned_pointcloud_global_inliers_publisher_.shutdown();
 
+	if (!aligned_pointcloud_global_inliers_and_outliers_publish_topic_.empty())
+		aligned_pointcloud_global_inliers_and_outliers_publisher_ = node_handle_->advertise<sensor_msgs::PointCloud2>(aligned_pointcloud_global_inliers_and_outliers_publish_topic_, 1, true);
+	else
+		aligned_pointcloud_global_inliers_and_outliers_publisher_.shutdown();
+
 	if (!reference_pointcloud_global_outliers_publish_topic_.empty())
 		reference_pointcloud_global_outliers_publisher_ = node_handle_->advertise<sensor_msgs::PointCloud2>(reference_pointcloud_global_outliers_publish_topic_, 1, true);
 	else
@@ -1548,6 +1555,11 @@ void Localization<PointT>::startPublishers() {
 		reference_pointcloud_global_inliers_publisher_ = node_handle_->advertise<sensor_msgs::PointCloud2>(reference_pointcloud_global_inliers_publish_topic_, 1, true);
 	else
 		reference_pointcloud_global_inliers_publisher_.shutdown();
+
+	if (!reference_pointcloud_global_inliers_and_outliers_publish_topic_.empty())
+		reference_pointcloud_global_inliers_and_outliers_publisher_ = node_handle_->advertise<sensor_msgs::PointCloud2>(reference_pointcloud_global_inliers_and_outliers_publish_topic_, 1, true);
+	else
+		reference_pointcloud_global_inliers_and_outliers_publisher_.shutdown();
 
 	if (!pose_stamped_publish_topic_.empty())
 		pose_stamped_publisher_ = node_handle_->advertise<geometry_msgs::PoseStamped>(pose_stamped_publish_topic_, 5, true);
@@ -2596,17 +2608,21 @@ template<typename PointT>
 void Localization<PointT>::publishDetectedOutliers() {
 	if (outlier_detectors_.size() == detected_outliers_.size()) {
 		for (size_t i = 0; i < detected_outliers_.size(); ++i) {
-			outlier_detectors_[i]->publishOutliers(detected_outliers_[i]);
+			if (outlier_detectors_[i]) outlier_detectors_[i]->publishOutliers(detected_outliers_[i]);
 		}
 	}
-	pointcloud_conversions::publishPointCloud(*registered_outliers_, aligned_pointcloud_global_outliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "aligned pointcloud global outliers");
+
+	if(registered_outliers_)
+		pointcloud_conversions::publishPointCloud(*registered_outliers_, aligned_pointcloud_global_outliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "aligned pointcloud global outliers");
 
 	if (outlier_detectors_reference_pointcloud_.size() == detected_outliers_reference_pointcloud_.size()) {
 		for (size_t i = 0; i < detected_outliers_reference_pointcloud_.size(); ++i) {
-			outlier_detectors_reference_pointcloud_[i]->publishOutliers(detected_outliers_reference_pointcloud_[i]);
+			if (outlier_detectors_reference_pointcloud_[i]) outlier_detectors_reference_pointcloud_[i]->publishOutliers(detected_outliers_reference_pointcloud_[i]);
 		}
 	}
-	pointcloud_conversions::publishPointCloud(*registered_outliers_reference_pointcloud_, reference_pointcloud_global_outliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "reference pointcloud global outliers");
+	
+	if (registered_outliers_reference_pointcloud_)
+		pointcloud_conversions::publishPointCloud(*registered_outliers_reference_pointcloud_, reference_pointcloud_global_outliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "reference pointcloud global outliers");
 
 	detected_outliers_.clear();
 	detected_outliers_reference_pointcloud_.clear();
@@ -2617,20 +2633,40 @@ template<typename PointT>
 void Localization<PointT>::publishDetectedInliers() {
 	if (outlier_detectors_.size() == detected_inliers_.size()) {
 		for (size_t i = 0; i < detected_inliers_.size(); ++i) {
-			outlier_detectors_[i]->publishInliers(detected_inliers_[i]);
+			if (outlier_detectors_[i]) outlier_detectors_[i]->publishInliers(detected_inliers_[i]);
 		}
 	}
-	pointcloud_conversions::publishPointCloud(*registered_inliers_, aligned_pointcloud_global_inliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "aligned pointcloud global inliers");
+	
+	if (registered_inliers_)
+		pointcloud_conversions::publishPointCloud(*registered_inliers_, aligned_pointcloud_global_inliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "aligned pointcloud global inliers");
 
 	if (outlier_detectors_reference_pointcloud_.size() == detected_inliers_reference_pointcloud_.size()) {
 		for (size_t i = 0; i < detected_inliers_reference_pointcloud_.size(); ++i) {
-			outlier_detectors_reference_pointcloud_[i]->publishInliers(detected_inliers_reference_pointcloud_[i]);
+			if (outlier_detectors_reference_pointcloud_[i]) outlier_detectors_reference_pointcloud_[i]->publishInliers(detected_inliers_reference_pointcloud_[i]);
 		}
 	}
-	pointcloud_conversions::publishPointCloud(*registered_inliers_reference_pointcloud_, reference_pointcloud_global_inliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "reference pointcloud global inliers");
+
+	if (registered_inliers_reference_pointcloud_)
+		pointcloud_conversions::publishPointCloud(*registered_inliers_reference_pointcloud_, reference_pointcloud_global_inliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "reference pointcloud global inliers");
 
 	detected_inliers_.clear();
 	detected_inliers_reference_pointcloud_.clear();
+}
+
+
+template<typename PointT>
+void Localization<PointT>::publishDetectedInliersAndOutliers() {
+	typename pcl::PointCloud<PointT>::Ptr registered_inliers_and_outliers(new pcl::PointCloud<PointT>());
+	typename pcl::PointCloud<PointT>::Ptr registered_inliers_and_outliers_reference_pointcloud(new pcl::PointCloud<PointT>());
+
+	if (registered_inliers_) *registered_inliers_and_outliers += *registered_inliers_;
+	if (registered_outliers_) *registered_inliers_and_outliers += *registered_outliers_;
+
+	if (registered_inliers_reference_pointcloud_) *registered_inliers_and_outliers_reference_pointcloud += *registered_inliers_reference_pointcloud_;
+	if (registered_outliers_reference_pointcloud_) *registered_inliers_and_outliers_reference_pointcloud += *registered_outliers_reference_pointcloud_;
+
+	pointcloud_conversions::publishPointCloud(*registered_inliers_and_outliers, aligned_pointcloud_global_inliers_and_outliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "aligned pointcloud global inliers and outliers");
+	pointcloud_conversions::publishPointCloud(*registered_inliers_and_outliers_reference_pointcloud, reference_pointcloud_global_inliers_and_outliers_publisher_, map_frame_id_, publish_global_inliers_and_outliers_pointclouds_only_if_there_is_subscribers_, "reference pointcloud global inliers and outliers");
 }
 
 
@@ -3232,6 +3268,7 @@ bool Localization<PointT>::updateLocalizationWithAmbientPointCloud(typename pcl:
 
 	publishDetectedOutliers();
 	publishDetectedInliers();
+	publishDetectedInliersAndOutliers();
 
 	if (ambient_pointcloud_integration) {
 		ROS_DEBUG("Switching SLAM cloud");

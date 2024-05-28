@@ -377,6 +377,7 @@ class Localization : public ConfigurableObject {
 
 		virtual void publishDetectedOutliers();
 		virtual void publishDetectedInliers();
+		virtual void publishDetectedInliersAndOutliers();
 
 		virtual bool applyCloudAnalyzers(const tf2::Transform& estimated_pose);
 
@@ -444,8 +445,10 @@ class Localization : public ConfigurableObject {
 		std::string aligned_pointcloud_publish_topic_;
 		std::string aligned_pointcloud_global_outliers_publish_topic_;
 		std::string aligned_pointcloud_global_inliers_publish_topic_;
+		std::string aligned_pointcloud_global_inliers_and_outliers_publish_topic_;
 		std::string reference_pointcloud_global_outliers_publish_topic_;
 		std::string reference_pointcloud_global_inliers_publish_topic_;
+		std::string reference_pointcloud_global_inliers_and_outliers_publish_topic_;
 		std::string pose_stamped_publish_topic_;
 		std::string pose_array_publish_topic_;
 		std::string pose_with_covariance_stamped_publish_topic_;
@@ -576,8 +579,10 @@ class Localization : public ConfigurableObject {
 		ros::Publisher aligned_pointcloud_publisher_;
 		ros::Publisher aligned_pointcloud_global_outliers_publisher_;
 		ros::Publisher aligned_pointcloud_global_inliers_publisher_;
+		ros::Publisher aligned_pointcloud_global_inliers_and_outliers_publisher_;
 		ros::Publisher reference_pointcloud_global_outliers_publisher_;
 		ros::Publisher reference_pointcloud_global_inliers_publisher_;
+		ros::Publisher reference_pointcloud_global_inliers_and_outliers_publisher_;
 		ros::Publisher pose_with_covariance_stamped_publisher_;
 		ros::Publisher pose_with_covariance_stamped_tracking_reset_publisher_;
 		ros::Publisher pose_stamped_publisher_;
